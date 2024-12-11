@@ -1,0 +1,106 @@
+{
+    "tokens": {
+        "PIP": {
+            "address": "0x6e990040Fd9b06F98eFb62A147201696941680b5",
+            "decimals": 6
+        },
+        "USDC": {
+            "address": "0x40fCa9cB1AB15eD9B5bDA19A52ac00A78AE08e1D",
+            "decimals": 6
+        },
+        "IP": {
+            "address": "0x2e5221B0f855Be4ea5Cefffb8311EED0563B6e87",
+            "decimals": 18
+        },
+        "WETH": {
+            "address": "0x1C13B2B65d55dF06FF43528E736Db2F8e372E692",
+            "decimals": 18
+        },
+        "WBTC": {
+            "address": "0x656afb1968bC39Cf3937f68CC6089F10cf47C1F7",
+            "decimals": 8
+        },
+        "USDT": {
+            "address": "0x02F75bdBb4732cc6419aC15EeBeE6BCee66e826f",
+            "decimals": 6
+        },
+        "WIP": {
+            "address": "0xe8CabF9d1FFB6CE23cF0a86641849543ec7BD7d5",
+            "decimals": 18
+        },
+        "vIP": {
+            "address": "0xCADC3EA1c18c40159c8A4163E6892bF04B9D6f0a",
+            "decimals": 18
+        },
+        "IPx": {
+            "address": "0x7F105A1EAF818f984d69dB3f4Cd6106ac187637f",
+            "decimals": 18
+        },
+        "USB": {
+            "address": "0x5E6E0075B9600E74AA0214c6F3b98235922e750A",
+            "decimals": 18
+        }
+    },
+
+    "pools": [
+        {
+            "token1": "PIP",
+            "token2": "IP"
+        },
+        {
+            "token1": "vIP",
+            "token2": "IP"
+        },
+        {
+            "token1": "IPx",
+            "token2": "IP"
+        },
+        {
+            "token1": "USB",
+            "token2": "IP"
+        },
+        {
+            "token1": "IP",
+            "token2": "USDC"
+        },
+        {
+            "token1": "WBTC",
+            "token2": "USDC"
+        },
+        {
+            "token1": "WETH",
+            "token2": "USDC"
+        },
+        {
+            "token1": "USDC",
+            "token2": "USDT"
+        }
+    ],
+
+    "v3pools": [
+        {
+            "token1": "PIP",
+            "token2": "IP"
+        },
+        {
+            "token1": "IP",
+            "token2": "USDC"
+        },
+        {
+            "token1": "WBTC",
+            "token2": "USDC"
+        },
+        {
+            "token1": "WETH",
+            "token2": "USDC"
+        },
+        {
+            "token1": "USDC",
+            "token2": "USDT"
+        },
+        {
+            "token1": "vIP",
+            "token2": "IP"
+        }
+    ]
+}
