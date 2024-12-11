@@ -1,15 +1,9 @@
 // import { readContract, getBalance, getBlock, writeContract, multicall } from '@wagmi/core'
 import { v2_factory_abi, v2_router_abi, piperv3Quoter_abi, multicall_abi} from './abi';
-import { provider, signer, v2RouterAddress, v2FactoryAddress, defaultTokens, piperv3QuoterAddress, multicallAddress } from './constant';
+import { provider, v2RouterAddress, v2FactoryAddress, defaultTokens, piperv3QuoterAddress, multicallAddress } from './constant';
 import { getCreate2Address } from '@ethersproject/address';
 import { keccak256, pack } from '@ethersproject/solidity';
 import { BigNumber, ethers} from 'ethers';
-
-const piperv3QuoterContract = new ethers.Contract(
-    piperv3QuoterAddress, 
-    piperv3Quoter_abi, 
-    signer
-);
 
 const multicallContract = new ethers.Contract(
     multicallAddress,
@@ -26,8 +20,15 @@ const v2RouterContract = new ethers.Contract(
 export const v3RoutingExactOutputSingle = async(
     tokenIn: string, 
     tokenOut: string, 
-    tokenOutAmount: bigint
+    tokenOutAmount: bigint,
+    signer: ethers.Signer 
 ) => {
+    const piperv3QuoterContract = new ethers.Contract(
+        piperv3QuoterAddress, 
+        piperv3Quoter_abi, 
+        signer
+    );
+    
     const quoteExactOutputSingleParams = {
         tokenIn,
         tokenOut,
