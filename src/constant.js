@@ -45,7 +45,6 @@ var abi_1 = require("./abi");
 var privateKey = "52d045318ba4d29e39918d8c14b7f734f20da97b293f34317fd0ed8c2b180c2f";
 var URL = 'https://odyssey.storyrpc.io/';
 exports.provider = new ethers_1.ethers.providers.JsonRpcProvider(URL);
-// export const walletAddress = accounts[0]    // first account in MetaMask
 exports.signer = new ethers_1.ethers.Wallet(privateKey, exports.provider);
 exports.defaultTokens = [
     '0x40fCa9cB1AB15eD9B5bDA19A52ac00A78AE08e1D',
@@ -53,7 +52,6 @@ exports.defaultTokens = [
     '0x6D46EF45795B1c3e2a5f2A3F7aba5ea551be966f'
 ];
 exports.fee2TickSpace = { "500": 10, "3000": 60, "10000": 200 };
-// export const fee2TickSpace = {"500": 10}
 exports.WIP_ADDRESS = "0xe8CabF9d1FFB6CE23cF0a86641849543ec7BD7d5";
 exports.v2FactoryAddress = "0x700722D24f9256Be288f56449E8AB1D27C4a70ca";
 exports.v2RouterAddress = "0x8812d810EA7CC4e1c3FB45cef19D6a7ECBf2D85D";

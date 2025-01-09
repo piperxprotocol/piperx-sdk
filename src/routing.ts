@@ -1,6 +1,6 @@
 // import { readContract, getBalance, getBlock, writeContract, multicall } from '@wagmi/core'
-import { v2_factory_abi, v2_router_abi, piperv3Quoter_abi, multicall_abi} from './abi';
-import { provider, v2RouterAddress, v2FactoryAddress, defaultTokens, piperv3QuoterAddress, multicallAddress } from './constant';
+import { v2_factory_abi, v2_router_abi, piperv3Quoter_abi, multicall_abi, piperv3_pool_abi, piperv3SwapRouter_abi} from './abi';
+import { provider, v2RouterAddress, v2FactoryAddress, defaultTokens, piperv3QuoterAddress, multicallAddress, piperv3SwapRouterAddress, WIP_ADDRESS, fee2TickSpace } from './constant';
 import { getCreate2Address } from '@ethersproject/address';
 import { keccak256, pack } from '@ethersproject/solidity';
 import { BigNumber, ethers} from 'ethers';
@@ -17,31 +17,152 @@ const v2RouterContract = new ethers.Contract(
     provider
 );
 
-export const v3RoutingExactOutputSingle = async(
+export const v3RoutingExactOutput = async(
     tokenIn: string, 
     tokenOut: string, 
     tokenOutAmount: bigint,
-    signer: ethers.Signer 
+    signer: ethers.Signer
 ) => {
-    const piperv3QuoterContract = new ethers.Contract(
-        piperv3QuoterAddress, 
-        piperv3Quoter_abi, 
+
+    // Create quoter contract instance
+    const quoterContract = new ethers.Contract(
+        piperv3QuoterAddress,
+        piperv3Quoter_abi,
+        signer
+    );
+
+    let bestRoute: string[] = []
+    let minAmountIn = ethers.constants.MaxUint256.toBigInt() // Max uint256 value
+    
+    // Prepare multicall data
+    const calls = []
+    const feeTiers = Object.keys(fee2TickSpace)
+    
+    for (const feeTier of feeTiers) {
+        // Encode the function call
+        const callData = quoterContract.interface.encodeFunctionData(
+            'quoteExactOutputSingle',
+            [{
+                tokenIn: tokenIn,
+                tokenOut: tokenOut,
+                amount: tokenOutAmount,
+                fee: feeTier,
+                sqrtPriceLimitX96: BigInt(0)
+            }]
+        );
+        
+        calls.push({
+            target: piperv3QuoterAddress,
+            callData
+        });
+    }
+
+    try {
+        // Use tryAggregate to allow partial success
+        const aggregateResult = await multicallContract.callStatic.tryAggregate(
+            false, // Don't require all calls to succeed
+            calls,
+            { gasLimit: calls.length * 30000000 }
+        );
+
+        // Process results
+        aggregateResult.forEach(([success, returnData]: [boolean, string], index: number) => {
+            if (success) {
+                try {
+                    const result = quoterContract.interface.decodeFunctionResult(
+                        'quoteExactOutputSingle', 
+                        returnData
+                    );
+                    const amountIn = BigInt(result.amountIn.toString());
+                    if (amountIn < minAmountIn) {
+                        minAmountIn = amountIn;
+                        bestRoute = [tokenIn, feeTiers[index], tokenOut];
+                    }
+                } catch (error) {
+                    console.log(`Error decoding result for fee tier ${feeTiers[index]}:`, error);
+                }
+            }
+        });
+    } catch (error) {
+        console.error("Multicall tryAggregate failed:", error);
+        return { bestRoute, minAmountIn }
+    }
+
+    return { bestRoute, minAmountIn }
+}
+
+
+export const v3RoutingExactInput = async(
+    tokenIn: string, 
+    tokenOut: string, 
+    tokenInAmount: bigint,
+    signer: ethers.Signer
+) => {
+    // Create quoter contract instance
+    const quoterContract = new ethers.Contract(
+        piperv3QuoterAddress,
+        piperv3Quoter_abi,
         signer
     );
     
-    const quoteExactOutputSingleParams = {
-        tokenIn,
-        tokenOut,
-        amount: tokenOutAmount,
-        fee: 500,
-        sqrtPriceLimitX96: BigInt(0)
-      }
-    let result = await piperv3QuoterContract.callStatic.quoteExactOutputSingle(
-        quoteExactOutputSingleParams,
-        {gasLimit: 5000000}
-    );
-    console.log("result: ", result.amountIn.toString());
-    return result.amountIn.toString()
+    let bestRoute: string[] = []
+    let maxAmountOut = BigInt(0)
+    
+    // Prepare multicall data
+    const calls = []
+    const feeTiers = Object.keys(fee2TickSpace)
+    
+    for (const feeTier of feeTiers) {
+        // Encode the function call
+        const callData = quoterContract.interface.encodeFunctionData(
+            'quoteExactInputSingle',
+            [{
+                tokenIn: tokenIn,
+                tokenOut: tokenOut,
+                amountIn: tokenInAmount,
+                fee: feeTier,
+                sqrtPriceLimitX96: BigInt(0)
+            }]
+        );
+        
+        calls.push({
+            target: piperv3QuoterAddress,
+            callData
+        });
+    }
+
+    try {
+        // Use tryAggregate to allow partial success
+        const aggregateResult = await multicallContract.callStatic.tryAggregate(
+            false, // Don't require all calls to succeed
+            calls,
+            { gasLimit: calls.length * 30000000 }
+        );
+
+        // Process results
+        aggregateResult.forEach(([success, returnData]: [boolean, string], index: number) => {
+            if (success) {
+                try {
+                    const result = quoterContract.interface.decodeFunctionResult(
+                        'quoteExactInputSingle', 
+                        returnData
+                    );
+                    const amountOut = BigInt(result.amountOut.toString());
+                    if (amountOut > maxAmountOut) {
+                        maxAmountOut = amountOut;
+                        bestRoute = [tokenIn, feeTiers[index], tokenOut];
+                    }
+                } catch (error) {
+                    console.log(`Error decoding result for fee tier ${feeTiers[index]}:`, error);
+                }
+            }
+        });
+    } catch (error) {
+        console.error("Multicall tryAggregate failed:", error);
+        return { bestRoute, maxAmountOut }
+    }
+
+    return { bestRoute, maxAmountOut }
 }
 
 export const v2RoutingExactInput = async(

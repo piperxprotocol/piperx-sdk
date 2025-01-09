@@ -39,32 +39,49 @@ Object.defineProperty(exports, "__esModule", { value: true });
 var ethers_1 = require("ethers");
 var routing_1 = require("./routing");
 var core_1 = require("./core");
+var constant_1 = require("./constant");
 function main() {
     return __awaiter(this, void 0, void 0, function () {
-        var PIPAddr, wipAddr, _a, bestRouteInput, maxAmountOut, _b, bestRouteOutput, minAmountIn, price, data;
-        return __generator(this, function (_c) {
-            switch (_c.label) {
+        var PIPAddr, wipAddr, _a, bestRouteInput, maxAmountOut, _b, bestRouteOutput, minAmountIn, price, _c, bestRouteOutputV3, minAmountInV3, _d, bestRouteInputV3, maxAmountOutV3, tx;
+        return __generator(this, function (_e) {
+            switch (_e.label) {
                 case 0:
                     PIPAddr = "0x6e990040Fd9b06F98eFb62A147201696941680b5";
                     wipAddr = '0xe8CabF9d1FFB6CE23cF0a86641849543ec7BD7d5';
-                    return [4 /*yield*/, (0, routing_1.v2RoutingExactInput)(wipAddr, PIPAddr, ethers_1.ethers.utils.parseUnits("1", 14).toBigInt())];
+                    return [4 /*yield*/, (0, routing_1.v2RoutingExactInput)(wipAddr, PIPAddr, ethers_1.ethers.utils.parseUnits("1", 18).toBigInt())];
                 case 1:
-                    _a = _c.sent(), bestRouteInput = _a.bestRoute, maxAmountOut = _a.maxAmountOut;
+                    _a = _e.sent(), bestRouteInput = _a.bestRoute, maxAmountOut = _a.maxAmountOut;
                     console.log("bestRoute: ", bestRouteInput);
                     console.log("maxAmountOut: ", Number(maxAmountOut));
                     return [4 /*yield*/, (0, routing_1.v2RoutingExactOutput)(wipAddr, PIPAddr, ethers_1.ethers.utils.parseUnits("1", 8).toBigInt())];
                 case 2:
-                    _b = _c.sent(), bestRouteOutput = _b.bestRoute, minAmountIn = _b.minAmountIn;
+                    _b = _e.sent(), bestRouteOutput = _b.bestRoute, minAmountIn = _b.minAmountIn;
                     console.log("bestRoute: ", bestRouteOutput);
                     console.log("minAmountIn: ", ethers_1.ethers.utils.formatUnits(minAmountIn, 18));
                     return [4 /*yield*/, (0, core_1.v2GetPriceWithDecimals)(wipAddr, PIPAddr, 18, 6)];
                 case 3:
-                    price = _c.sent();
+                    price = _e.sent();
                     console.log("price: ", price);
-                    return [4 /*yield*/, (0, core_1.fetchDailyData)()];
+                    return [4 /*yield*/, (0, routing_1.v3RoutingExactOutput)(wipAddr, PIPAddr, ethers_1.ethers.utils.parseUnits("1", 8).toBigInt(), constant_1.signer)];
                 case 4:
-                    data = _c.sent();
-                    console.log("data: ", data);
+                    _c = _e.sent(), bestRouteOutputV3 = _c.bestRoute, minAmountInV3 = _c.minAmountIn;
+                    console.log("bestRoute: ", bestRouteOutputV3);
+                    console.log("minAmountIn: ", ethers_1.ethers.utils.formatUnits(minAmountInV3, 18));
+                    return [4 /*yield*/, (0, routing_1.v3RoutingExactInput)(wipAddr, PIPAddr, ethers_1.ethers.utils.parseUnits("1", 18).toBigInt(), constant_1.signer)];
+                case 5:
+                    _d = _e.sent(), bestRouteInputV3 = _d.bestRoute, maxAmountOutV3 = _d.maxAmountOut;
+                    console.log("bestRoute: ", bestRouteInputV3);
+                    console.log("maxAmountOut: ", ethers_1.ethers.utils.formatUnits(maxAmountOutV3, 8));
+                    // const path = [
+                    //     WIP_ADDRESS,
+                    //     "3000",
+                    //     PIPAddr
+                    // ]
+                    console.log("timestamp: ", Math.floor(Date.now() / 1000));
+                    return [4 /*yield*/, (0, core_1.v3Swap)(ethers_1.ethers.utils.parseUnits("0.1", 18).toBigInt(), BigInt(0), bestRouteInputV3, BigInt(Math.floor(Date.now() / 1000) + 120), constant_1.signer)];
+                case 6:
+                    tx = _e.sent();
+                    console.log("v3 swap tx: ", tx);
                     return [2 /*return*/];
             }
         });
