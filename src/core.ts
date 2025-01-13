@@ -73,7 +73,7 @@ export const v3CreatePool = async(
     initialPrice: number,
     signer: ethers.Signer
 ) => {
-    const factory = new ethers.Contract(piperv3FactoryAddress, piperv3_factory_abi, signer);
+    const factory = new ethers.Contract(piperv3NFTPositionManagerAddress, nft_position_manager_abi, signer);
     const tx = await factory.createAndInitializePoolIfNecessary(token0, token1, fee, initialPrice);
     return await tx.wait();
 }

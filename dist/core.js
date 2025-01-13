@@ -9,7 +9,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.routerTokenApproval = exports.v3RouterTokenApproval = exports.v2RouterTokenApproval = exports.v2RemoveLiquidity = exports.v2AddLiquidity = exports.v2Swap = exports.v2GetPriceWithDecimals = exports.v2GetPrice = exports.v3GetPriceWithDecimals = exports.v3GetPrice = exports.swap = exports.v3Swap = exports.encodeV3Path = exports.v3AddLiquidity = exports.v3RemoveLiquidity = exports.v3ClaimFee = void 0;
+exports.v3PositionManagerTokenApproval = exports.routerTokenApproval = exports.v3RouterTokenApproval = exports.v2RouterTokenApproval = exports.v2RemoveLiquidity = exports.v2AddLiquidity = exports.v2Swap = exports.v2GetPriceWithDecimals = exports.v2GetPrice = exports.v3GetPriceWithDecimals = exports.v3GetPrice = exports.swap = exports.v3Swap = exports.encodeV3Path = exports.v3AddLiquidity = exports.v3CreatePool = exports.v3RemoveLiquidity = exports.v3ClaimFee = void 0;
 const abi_js_1 = require("./abi.js");
 const constant_js_1 = require("./constant.js");
 const ethers_1 = require("ethers");
@@ -53,15 +53,21 @@ const v3RemoveLiquidity = (token1, token2, tokenId, liquidity, amount1Min, amoun
     }
 });
 exports.v3RemoveLiquidity = v3RemoveLiquidity;
-const v3AddLiquidity = (token1, token2, amount1, amount2, tickLower, tickUpper, fee = 3000, // Default to 0.3% fee tier
+const v3CreatePool = (token0, token1, fee = 3000, initialPrice, signer) => __awaiter(void 0, void 0, void 0, function* () {
+    const factory = new ethers_1.ethers.Contract(constant_js_1.piperv3NFTPositionManagerAddress, abi_js_1.nft_position_manager_abi, signer);
+    const tx = yield factory.createAndInitializePoolIfNecessary(token0, token1, fee, initialPrice);
+    return yield tx.wait();
+});
+exports.v3CreatePool = v3CreatePool;
+const v3AddLiquidity = (token1, token2, amount1, amount2, amount1Min, amount2Min, tickLower, tickUpper, fee = 3000, // Default to 0.3% fee tier
 expirationTimestamp, signer) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const positionManager = new ethers_1.ethers.Contract(constant_js_1.piperv3NFTPositionManagerAddress, abi_js_1.nft_position_manager_abi, signer);
         let tx;
         // Ensure token order is correct (token0 < token1)
-        const [token0, token1_, amount0Sorted, amount1Sorted] = token1.toLowerCase() < token2.toLowerCase()
-            ? [token1, token2, amount1, amount2]
-            : [token2, token1, amount2, amount1];
+        const [token0, token1_, amount0Sorted, amount1Sorted, amount0MinSorted, amount1MinSorted] = token1.toLowerCase() < token2.toLowerCase()
+            ? [token1, token2, amount1, amount2, amount1Min, amount2Min]
+            : [token2, token1, amount2, amount1, amount2Min, amount1Min];
         const params = {
             token0: token0,
             token1: token1_,
@@ -70,8 +76,8 @@ expirationTimestamp, signer) => __awaiter(void 0, void 0, void 0, function* () {
             tickUpper: tickUpper,
             amount0Desired: amount0Sorted,
             amount1Desired: amount1Sorted,
-            amount0Min: 0,
-            amount1Min: 0,
+            amount0Min: amount0MinSorted,
+            amount1Min: amount1MinSorted,
             recipient: yield signer.getAddress(),
             deadline: expirationTimestamp
         };
@@ -325,3 +331,10 @@ const routerTokenApproval = (token, amount, path, signer) => __awaiter(void 0, v
     }
 });
 exports.routerTokenApproval = routerTokenApproval;
+const v3PositionManagerTokenApproval = (token, amount, signer) => __awaiter(void 0, void 0, void 0, function* () {
+    const tokenContract = new ethers_1.ethers.Contract(token, abi_js_1.abi, signer);
+    // Approve router to spend tokens
+    const tx = yield tokenContract.approve(constant_js_1.piperv3NFTPositionManagerAddress, amount);
+    return yield tx.wait();
+});
+exports.v3PositionManagerTokenApproval = v3PositionManagerTokenApproval;
