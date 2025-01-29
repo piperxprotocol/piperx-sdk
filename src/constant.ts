@@ -6,7 +6,7 @@ import { piperv3_factory_abi } from './abi';
 
 const URL = 'https://odyssey.storyrpc.io/'
 export const provider = new ethers.providers.JsonRpcProvider(URL);
-// export const signer = new ethers.Wallet(privateKey, provider)
+export const signer = new ethers.Wallet(process.env.PRIVATE_KEY as string, provider)
 
 export const defaultTokens = [
   '0x40fCa9cB1AB15eD9B5bDA19A52ac00A78AE08e1D',

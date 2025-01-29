@@ -10,7 +10,8 @@ export const v3ClaimFee = async(
     recipient: string,
     amount0Max: bigint,
     amount1Max: bigint,
-    signer: ethers.Signer
+    signer: ethers.Signer,
+    customGasLimit?: number
 ) => {
     try {
         const positionManager = new ethers.Contract(
@@ -26,7 +27,8 @@ export const v3ClaimFee = async(
             amount1Max: amount1Max
         };
 
-        const tx = await positionManager.collect(params);
+        const options = customGasLimit ? { gasLimit: customGasLimit } : {};
+        const tx = await positionManager.collect(params, options);
         return await tx.wait();
     } catch (error) {
         console.error("Error in v3claimFee:", error);
@@ -42,7 +44,8 @@ export const v3RemoveLiquidity = async(
     amount1Min: bigint,
     amount2Min: bigint,
     expirationTimestamp: bigint,
-    signer: ethers.Signer
+    signer: ethers.Signer,
+    customGasLimit?: number
 ) => {
     try {
         const positionManager = new ethers.Contract(piperv3NFTPositionManagerAddress, nft_position_manager_abi, signer);
@@ -57,7 +60,7 @@ export const v3RemoveLiquidity = async(
             deadline: expirationTimestamp
         };
 
-        tx = await positionManager.decreaseLiquidity(params);
+        tx = await positionManager.decreaseLiquidity(params, customGasLimit ? { gasLimit: customGasLimit } : {});
         let receipt = await tx.wait();
         return receipt;
     } catch (error) {
@@ -71,10 +74,17 @@ export const v3CreatePool = async(
     token1: string,
     fee: number = 3000,
     initialPrice: number,
-    signer: ethers.Signer
+    signer: ethers.Signer,
+    customGasLimit?: number
 ) => {
     const factory = new ethers.Contract(piperv3NFTPositionManagerAddress, nft_position_manager_abi, signer);
-    const tx = await factory.createAndInitializePoolIfNecessary(token0, token1, fee, initialPrice);
+    const tx = await factory.createAndInitializePoolIfNecessary(
+        token0, 
+        token1, 
+        fee, 
+        initialPrice, 
+        customGasLimit ? { gasLimit: customGasLimit } : {}
+    );
     return await tx.wait();
 }
 
@@ -89,7 +99,8 @@ export const v3AddLiquidity = async(
     tickUpper: number,
     fee: number = 3000, // Default to 0.3% fee tier
     expirationTimestamp: bigint,
-    signer: ethers.Signer
+    signer: ethers.Signer,
+    customGasLimit?: number
 ) => {
     try {
         const positionManager = new ethers.Contract(piperv3NFTPositionManagerAddress, nft_position_manager_abi, signer);
@@ -116,9 +127,12 @@ export const v3AddLiquidity = async(
 
         if (token0 === WIP_ADDRESS || token1_ === WIP_ADDRESS) {
             const value = token0 === WIP_ADDRESS ? amount0Sorted : amount1Sorted;
-            tx = await positionManager.mint(params, { value });
+            tx = await positionManager.mint(params, { 
+                value, 
+                ...(customGasLimit ? { gasLimit: customGasLimit } : {})
+            });
         } else {
-            tx = await positionManager.mint(params);
+            tx = await positionManager.mint(params, customGasLimit ? { gasLimit: customGasLimit } : {});
         }
 
         return await tx.wait();
@@ -150,7 +164,8 @@ export const v3Swap = async(
     amount2Min: bigint,
     path: string[], 
     expirationTimestamp: bigint,
-    signer: ethers.Signer
+    signer: ethers.Signer,
+    customGasLimit?: number
 ) => {
     if (path.length != 3) {
         throw new Error("path must contain 3 elements");
@@ -167,7 +182,10 @@ export const v3Swap = async(
                 deadline: expirationTimestamp,
                 amountIn: amount1,
                 amountOutMinimum: amount2Min
-            }, { value: amount1,  gasLimit: 30000000 });
+            }, { 
+                value: amount1,  
+                ...(customGasLimit ? { gasLimit: customGasLimit } : {})
+            });
         }else{ // swap Exact tokens for IP or tokens
             tx = await router.exactInput({
                 path: encodeV3Path,
@@ -175,7 +193,7 @@ export const v3Swap = async(
                 deadline: expirationTimestamp,
                 amountIn: amount1,
                 amountOutMinimum: amount2Min
-            }, { gasLimit: 30000000});
+            }, customGasLimit ? { gasLimit: customGasLimit } : {});
         }
         // if (path[0] == WIP_ADDRESS) { // swap Exact IP for tokens
         // tx = await router.exactInputSingle(
@@ -211,12 +229,13 @@ export const swap = async(
     amount2Min: bigint,
     path: string[], 
     expirationTimestamp: bigint,
-    signer: ethers.Signer
+    signer: ethers.Signer,
+    customGasLimit?: number
 ) => {
     if (path[1].length < 10) { // v3 swap
-        return await v3Swap(amount1, amount2Min, path, expirationTimestamp, signer);
+        return await v3Swap(amount1, amount2Min, path, expirationTimestamp, signer, customGasLimit);
     } else { // v2 swap
-        return await v2Swap(amount1, amount2Min, path, expirationTimestamp, signer);
+        return await v2Swap(amount1, amount2Min, path, expirationTimestamp, signer, customGasLimit);
     }
 }
 
@@ -303,7 +322,8 @@ export const v2Swap = async(
     amount2Min: bigint,
     path: string[], 
     expirationTimestamp: bigint,
-    signer: ethers.Signer
+    signer: ethers.Signer,
+    customGasLimit?: number
 ) => {
     try {
         const router = new ethers.Contract(v2RouterAddress, v2_router_abi, signer);
@@ -315,7 +335,10 @@ export const v2Swap = async(
                 path,
                 signer.getAddress(),
                 expirationTimestamp,
-                { value: amount1 }
+                { 
+                    value: amount1, 
+                    ...(customGasLimit ? { gasLimit: customGasLimit } : {})
+                }
             );
         } else if (path[path.length - 1] == WIP_ADDRESS) { // swap Exact tokens for ETH
             tx = await router.swapExactTokensForETH(
@@ -323,7 +346,8 @@ export const v2Swap = async(
                 amount2Min,
                 path,
                 signer.getAddress(),
-                expirationTimestamp
+                expirationTimestamp,
+                customGasLimit ? { gasLimit: customGasLimit } : {}
             );
         } else {
             tx = await router.swapExactTokensForTokens(
@@ -331,7 +355,8 @@ export const v2Swap = async(
                 amount2Min,
                 path,
                 signer.getAddress(),
-                expirationTimestamp
+                expirationTimestamp,
+                customGasLimit ? { gasLimit: customGasLimit } : {}
             );
         }
 
@@ -350,7 +375,8 @@ export const v2AddLiquidity = async(
     amount1Min: bigint,
     amount2Min: bigint,
     expirationTimestamp: bigint,
-    signer: ethers.Signer
+    signer: ethers.Signer,
+    customGasLimit?: number
 ) => {
     try {
         const router = new ethers.Contract(v2RouterAddress, v2_router_abi, signer);
@@ -364,7 +390,10 @@ export const v2AddLiquidity = async(
                 amount1Min,
                 signer.getAddress(),
                 expirationTimestamp,
-                { value: amount1 }
+                { 
+                    value: amount1, 
+                    ...(customGasLimit ? { gasLimit: customGasLimit } : {})
+                }
             );
         } else if (token2 == WIP_ADDRESS) {
             tx = await router.addLiquidityETH(
@@ -374,7 +403,10 @@ export const v2AddLiquidity = async(
                 amount2Min,
                 signer.getAddress(),
                 expirationTimestamp,
-                { value: amount2 }
+                { 
+                    value: amount2, 
+                    ...(customGasLimit ? { gasLimit: customGasLimit } : {})
+                }
             );
         } else {
             tx = await router.addLiquidity(
@@ -385,7 +417,8 @@ export const v2AddLiquidity = async(
                 amount1Min,
                 amount2Min,
                 signer.getAddress(),
-                expirationTimestamp
+                expirationTimestamp,
+                customGasLimit ? { gasLimit: customGasLimit } : {}
             );
         }
 
@@ -403,7 +436,8 @@ export const v2RemoveLiquidity = async(
     amount1Min: bigint,
     amount2Min: bigint,
     expirationTimestamp: bigint,
-    signer: ethers.Signer
+    signer: ethers.Signer,
+    customGasLimit?: number
 ) => {
     try {
         const router = new ethers.Contract(v2RouterAddress, v2_router_abi, signer);
@@ -416,7 +450,8 @@ export const v2RemoveLiquidity = async(
                 amount2Min,
                 amount1Min,
                 signer.getAddress(),
-                expirationTimestamp
+                expirationTimestamp,
+                customGasLimit ? { gasLimit: customGasLimit } : {}
             );
         } else if (token2 == WIP_ADDRESS) {
             tx = await router.removeLiquidityETH(
@@ -425,7 +460,8 @@ export const v2RemoveLiquidity = async(
                 amount1Min,
                 amount2Min,
                 signer.getAddress(),
-                expirationTimestamp
+                expirationTimestamp,
+                customGasLimit ? { gasLimit: customGasLimit } : {}
             );
         } else {
             tx = await router.removeLiquidity(
@@ -435,7 +471,8 @@ export const v2RemoveLiquidity = async(
                 amount1Min,
                 amount2Min,
                 signer.getAddress(),
-                expirationTimestamp
+                expirationTimestamp,
+                customGasLimit ? { gasLimit: customGasLimit } : {}
             );
         }
 
@@ -449,14 +486,16 @@ export const v2RemoveLiquidity = async(
 export const v2RouterTokenApproval = async(
     token: string,
     amount: bigint,
-    signer: ethers.Signer
+    signer: ethers.Signer,
+    customGasLimit?: number
 ) => {
     try {
-        // Create contract instance for the token
         const tokenContract = new ethers.Contract(token, abi, signer);
-        
-        // Approve router to spend tokens
-        const tx = await tokenContract.approve(v2RouterAddress, amount);
+        const tx = await tokenContract.approve(
+            v2RouterAddress, 
+            amount, 
+            customGasLimit ? { gasLimit: customGasLimit } : {}
+        );
         return await tx.wait();
     } catch (error) {
         console.error("Error in v2RouterTokenApproval:", error);
@@ -467,14 +506,16 @@ export const v2RouterTokenApproval = async(
 export const v3RouterTokenApproval = async(
     token: string,
     amount: bigint,
-    signer: ethers.Signer
+    signer: ethers.Signer,
+    customGasLimit?: number
 ) => {
     try {
-        // Create contract instance for the token
         const tokenContract = new ethers.Contract(token, abi, signer);
-        
-        // Approve router to spend tokens
-        const tx = await tokenContract.approve(piperv3SwapRouterAddress, amount);
+        const tx = await tokenContract.approve(
+            piperv3SwapRouterAddress, 
+            amount, 
+            customGasLimit ? { gasLimit: customGasLimit } : {}
+        );
         return await tx.wait();
     } catch (error) {
         console.error("Error in v3RouterTokenApproval:", error);
@@ -486,23 +527,27 @@ export const routerTokenApproval = async(
     token: string,
     amount: bigint,
     path: string[],
-    signer: ethers.Signer
+    signer: ethers.Signer,
+    customGasLimit?: number
 ) => {
     if (path[1].length < 10) { // v3 swap
-        return await v3RouterTokenApproval(token, amount, signer);
+        return await v3RouterTokenApproval(token, amount, signer, customGasLimit);
     } else { // v2 swap
-        return await v2RouterTokenApproval(token, amount, signer);
+        return await v2RouterTokenApproval(token, amount, signer, customGasLimit);
     }
 }
 
 export const v3PositionManagerTokenApproval = async(
     token: string,
     amount: bigint,
-    signer: ethers.Signer
+    signer: ethers.Signer,
+    customGasLimit?: number
 ) => {
     const tokenContract = new ethers.Contract(token, abi, signer);
-        
-    // Approve router to spend tokens
-    const tx = await tokenContract.approve(piperv3NFTPositionManagerAddress, amount);
+    const tx = await tokenContract.approve(
+        piperv3NFTPositionManagerAddress, 
+        amount, 
+        customGasLimit ? { gasLimit: customGasLimit } : {}
+    );
     return await tx.wait();
 }

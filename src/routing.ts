@@ -32,7 +32,7 @@ export const v3RoutingExactOutput = async(
     );
 
     let bestRoute: string[] = []
-    let minAmountIn = ethers.constants.MaxUint256.toBigInt() // Max uint256 value
+    let minAmountIn = BigInt(ethers.constants.MaxUint256.toString()) // Changed to use BigInt consistently
     
     // Prepare multicall data
     const calls = []
@@ -256,7 +256,7 @@ export const v2RoutingExactOutput = async(
     tokenOutAmount: bigint
 ) => {
     let bestRoute: string[] = []
-    let minAmountIn = ethers.constants.MaxUint256 // Max uint256 value
+    let minAmountIn = BigInt(ethers.constants.MaxUint256.toString()) // Changed to use BigInt consistently
 
     // Direct route
     try {
@@ -302,8 +302,8 @@ export const v2RoutingExactOutput = async(
             if (success) {
                 try {
                     const result = v2RouterContract.interface.decodeFunctionResult('getAmountsIn', returnData);
-                    const amountIn = BigNumber.from(result[0]);
-                    if (amountIn.lt(minAmountIn)) {
+                    const amountIn = BigInt(result[0].toString());
+                    if (amountIn < minAmountIn) {
                         minAmountIn = amountIn;
                         bestRoute = [tokenIn, intermediateTokens[index], tokenOut];
                     }
@@ -325,17 +325,31 @@ export const v2RoutingExactOutput = async(
 export const routingExactInput = async(
     tokenIn: string, 
     tokenOut: string, 
-    tokenInAmount: bigint
+    tokenInAmount: bigint,
+    signer: ethers.Signer
 ) => {
     const { bestRoute, maxAmountOut } = await v2RoutingExactInput(tokenIn, tokenOut, tokenInAmount);
-    return { bestRoute, maxAmountOut }
+    const { bestRoute: bestRouteV3, maxAmountOut: maxAmountOutV3 } = await v3RoutingExactInput(tokenIn, tokenOut, tokenInAmount, signer);
+
+    if (maxAmountOut > maxAmountOutV3) {
+        return { bestRoute, maxAmountOut }
+    } else {
+        return { bestRoute: bestRouteV3, maxAmountOut: maxAmountOutV3 }
+    }
 }
 
 export const routingExactOutput = async(
     tokenIn: string, 
     tokenOut: string, 
-    tokenOutAmount: bigint
+    tokenOutAmount: bigint,
+    signer: ethers.Signer
 ) => {
     const { bestRoute, minAmountIn } = await v2RoutingExactOutput(tokenIn, tokenOut, tokenOutAmount);
-    return { bestRoute, minAmountIn }
+    const { bestRoute: bestRouteV3, minAmountIn: minAmountInV3 } = await v3RoutingExactOutput(tokenIn, tokenOut, tokenOutAmount, signer);
+
+    if (minAmountIn < minAmountInV3) {
+        return { bestRoute, minAmountIn }
+    } else {
+        return { bestRoute: bestRouteV3, minAmountIn: minAmountInV3 }
+    }
 }
