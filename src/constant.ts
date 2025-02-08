@@ -1,12 +1,12 @@
 import { ethers } from 'ethers';
-import { keccak256 } from 'ethers/lib/utils';
+import { defaultAbiCoder, keccak256 } from 'ethers/lib/utils';
 import { getCreate2Address } from 'ethers/lib/utils';
 import { solidityPack } from 'ethers/lib/utils';
 import { piperv3_factory_abi } from './abi';
+import { providers } from 'ethers';
 
-const URL = 'https://odyssey.storyrpc.io/'
-export const provider = new ethers.providers.JsonRpcProvider(URL);
-export const signer = new ethers.Wallet(process.env.PRIVATE_KEY as string, provider)
+const URL = 'https://story-testnet-evm.itrocket.net';
+export const provider = new providers.JsonRpcProvider(URL);
 
 export const defaultTokens = [
   '0x40fCa9cB1AB15eD9B5bDA19A52ac00A78AE08e1D',
@@ -32,6 +32,10 @@ export const piperv3NFTPositionManagerAddress = "0xf03c65d9be145746f800E2781eD14
 
 export const multicallAddress = "0xcA11bde05977b3631167028862bE2a173976CA11"
 
+export const initCodeHash = "0x754f724019203c806610a02ada224eb21dbe068a93d50486e52cf0ae30de457a"
+
+export const initCodeHashV3 = "0x1cb99584253b4230d0d18ef2cee0e35dd6d40717627345fbed0a92fed9392bd9"
+
 export const v2ComputeAddress = (token0: string, token1: string) => {
   const [token0Sorted, token1Sorted] = token0.toLowerCase() < token1.toLowerCase()
       ? [token0, token1]
@@ -47,15 +51,13 @@ export const v3ComputeAddress = async (
   token0: string, 
   token1: string, 
   fee: number
-): Promise<string> => {
-  
-  const contract = new ethers.Contract(piperv3FactoryAddress, piperv3_factory_abi, provider);
-  
-  const poolAddress = await contract.getPool(
-    token0,
-    token1,
-    fee
-  );
-  
-  return poolAddress;
+) => {
+  const [token0Sorted, token1Sorted] = token0.toLowerCase() < token1.toLowerCase()
+      ? [token0, token1]
+      : [token1, token0]
+
+  const salt = keccak256(defaultAbiCoder.encode(['address', 'address', 'uint24'], [token0Sorted, token1Sorted, fee]));
+  const initCodeHash = initCodeHashV3
+
+  return getCreate2Address(piperv3FactoryAddress, salt, initCodeHash) as `0x${string}`  
 }

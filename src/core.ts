@@ -1,8 +1,8 @@
-import { abi, nft_position_manager_abi, piperv3_factory_abi, piperv3_pool_abi, piperv3SwapRouter_abi, v2_factory_abi, v2_pool_abi, v2_router_abi} from './abi.js'
-import { WIP_ADDRESS, piperv3FactoryAddress, piperv3NFTPositionManagerAddress, piperv3SwapRouterAddress, provider, v2ComputeAddress, v2RouterAddress } from './constant.js'
+import { abi, nft_position_manager_abi, piperv3_factory_abi, piperv3_pool_abi, piperv3SwapRouter_abi, v2_factory_abi, v2_pool_abi, v2_router_abi} from './abi'
+import { WIP_ADDRESS, piperv3FactoryAddress, piperv3NFTPositionManagerAddress, piperv3SwapRouterAddress, provider, v2ComputeAddress, v2RouterAddress } from './constant'
 import { ethers } from 'ethers'
-import { routingExactInput } from './routing.js'
-import { keccak256 } from 'ethers/lib/utils.js'
+import { routingExactInput } from './routing'
+import { keccak256 } from 'ethers/lib/utils'
 import axios from 'axios';
 
 export const v3ClaimFee = async(
@@ -172,7 +172,7 @@ export const v3Swap = async(
     }
     try {
         const router = new ethers.Contract(piperv3SwapRouterAddress, piperv3SwapRouter_abi, signer);
-        //const wip = new ethers.Contract(WIP_ADDRESS, piperv3_pool_abi, signer);
+
         let tx;
         const encodedPath = encodeV3Path(path);
         if (path[0] == WIP_ADDRESS) { // swap Exact IP for tokens
@@ -186,7 +186,15 @@ export const v3Swap = async(
                 value: amount1,  
                 ...(customGasLimit ? { gasLimit: customGasLimit } : {})
             });
-        }else{ // swap Exact tokens for IP or tokens
+        } else if (path[path.length - 1] == WIP_ADDRESS) { // TODO: swap Exact tokens for IP
+            tx = await router.exactInput({
+                path: encodeV3Path,
+                recipient: await signer.getAddress(),
+                deadline: expirationTimestamp,
+                amountIn: amount1,
+                amountOutMinimum: amount2Min
+            }, customGasLimit ? { gasLimit: customGasLimit } : {});
+        } else { // swap Exact tokens for tokens
             tx = await router.exactInput({
                 path: encodeV3Path,
                 recipient: await signer.getAddress(),
@@ -195,29 +203,7 @@ export const v3Swap = async(
                 amountOutMinimum: amount2Min
             }, customGasLimit ? { gasLimit: customGasLimit } : {});
         }
-        // if (path[0] == WIP_ADDRESS) { // swap Exact IP for tokens
-        // tx = await router.exactInputSingle(
-        //     {tokenIn: path[0],
-        //     tokenOut: path[2],
-        //     fee: path[1],
-        //     recipient: await signer.getAddress(),
-        //     deadline: expirationTimestamp,
-        //     amountIn: amount1,
-        //     amountOutMinimum: amount2Min,
-        //     sqrtPriceLimitX96: BigInt(0)}, { value: amount1, gasLimit: 3000000 });
-        //     return await tx.wait();
-        // } else { // swap Exact tokens for IP or tokens
-        //     tx = await router.exactInputSingle(
-        //         {tokenIn: path[0],
-        //         tokenOut: path[2],
-        //         fee: path[1],
-        //         recipient: await signer.getAddress(),
-        //         deadline: expirationTimestamp,
-        //         amountIn: amount1,
-        //         amountOutMinimum: amount2Min,
-        //         sqrtPriceLimitX96: BigInt(0)}, { gasLimit: 3000000 });
-        //     return await tx.wait();
-        // }
+        return tx.wait();
     } catch (error) {
         console.error("Error in v3 swap:", error);
         throw error;
@@ -327,40 +313,51 @@ export const v2Swap = async(
 ) => {
     try {
         const router = new ethers.Contract(v2RouterAddress, v2_router_abi, signer);
-        let tx;
+        
+        // Get current gas price and add 20% to ensure faster processing
+        const gasPrice = await provider.getGasPrice();
+        const adjustedGasPrice = (gasPrice.toBigInt() * BigInt(120)) / BigInt(100);
+        
+        const txOptions = {
+            gasPrice: adjustedGasPrice,
+            ...(customGasLimit ? { gasLimit: customGasLimit } : {}), // Only include gasLimit if custom value provided
+        };
 
-        if (path[0] == WIP_ADDRESS) { // swap Exact ETH for tokens
+        let tx;
+        if (path[0] == WIP_ADDRESS) {
             tx = await router.swapExactETHForTokens(
                 amount2Min,
                 path,
-                signer.getAddress(),
+                await signer.getAddress(),  // Make sure we await this
                 expirationTimestamp,
                 { 
-                    value: amount1, 
-                    ...(customGasLimit ? { gasLimit: customGasLimit } : {})
+                    ...txOptions,
+                    value: amount1
                 }
             );
-        } else if (path[path.length - 1] == WIP_ADDRESS) { // swap Exact tokens for ETH
+        } else if (path[path.length - 1] == WIP_ADDRESS) {
             tx = await router.swapExactTokensForETH(
                 amount1,
                 amount2Min,
                 path,
-                signer.getAddress(),
+                await signer.getAddress(),  // Make sure we await this
                 expirationTimestamp,
-                customGasLimit ? { gasLimit: customGasLimit } : {}
+                txOptions
             );
         } else {
             tx = await router.swapExactTokensForTokens(
                 amount1,
                 amount2Min,
                 path,
-                signer.getAddress(),
+                await signer.getAddress(),  // Make sure we await this
                 expirationTimestamp,
-                customGasLimit ? { gasLimit: customGasLimit } : {}
+                txOptions
             );
         }
 
-        return await tx.wait();
+        console.log("Transaction submitted:", tx.hash);
+        
+        return tx.wait()
     } catch (error) {
         console.error("Error in swap:", error);
         throw error;

@@ -9,7 +9,7 @@ dist/
 
 # TypeScript source file
 src/main.ts
-
+src/main.js
 # IDE and editor files
 .vscode/
 .idea/
