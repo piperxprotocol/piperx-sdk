@@ -171,7 +171,10 @@ export const v3Swap = async(
         throw new Error("path must contain 3 elements");
     }
 
-    const address = signer.getAddress();
+    // let encodePath = encodeV3Path(path);
+    // console.log("encodePath: ", encodePath);
+    const address = await signer.getAddress();
+    // console.log("address: ", address);
     try {
         const router = new ethers.Contract(piperv3SwapRouterAddress, piperv3SwapRouter_abi, signer);
 
@@ -184,16 +187,16 @@ export const v3Swap = async(
             ...(customGasLimit ? { gasLimit: customGasLimit } : {})
         };
 
-        console.log("Preparing V3 swap with options:", {
-            gasPrice: ethers.utils.formatUnits(adjustedGasPrice, "gwei"),
-        });
+        // console.log("Preparing V3 swap with options:", {
+        //     gasPrice: ethers.utils.formatUnits(adjustedGasPrice, "gwei"),
+        // });
 
         let tx;
         const exactInputSingleParams = {
             tokenIn: path[0],
-            tokenOut: path[1],
-            fee: path[2],
-            recipient: path[1] === WIP_ADDRESS ? ethers.constants.AddressZero : address,
+            tokenOut: path[2],
+            fee: path[1],
+            recipient: path[2] === WIP_ADDRESS ? ethers.constants.AddressZero : address,
             deadline: expirationTimestamp,
             amountIn: amount1,
             amountOutMinimum: amount2Min,
@@ -209,7 +212,7 @@ export const v3Swap = async(
                     value: amount1
                 }
             );
-        } else if (path[1] === WIP_ADDRESS) { 
+        } else if (path[2] === WIP_ADDRESS) { 
             // Case 2: Token to IP (ERC-20 to Native IP)
             const swapRouterInterface = new ethers.utils.Interface(piperv3SwapRouter_abi);
             const peripheryPaymentsInterface = new ethers.utils.Interface([
@@ -233,32 +236,9 @@ export const v3Swap = async(
             );
         }
 
-        console.log("V3 Transaction submitted:", tx.hash);
+        // console.log("V3 Transaction submitted:", tx.hash);
         return await tx.wait();
 
-        // try {
-        //     const receipt = await Promise.race([
-        //         (async () => {
-        //             const receipt = await tx.wait(1);
-        //             console.log("Transaction mined in block:", receipt.blockNumber);
-        //             return receipt;
-        //         })(),
-        //         new Promise((_, reject) => 
-        //             setTimeout(() => reject(new Error('Transaction timeout after 60 seconds')), 60000)
-        //         )
-        //     ]);
-            
-        //     console.log("Transaction confirmed:", receipt.hash);
-        //     return receipt;
-        // } catch (waitError) {
-        //     // Check if transaction is still pending
-        //     const txResponse = await provider.getTransaction(tx.hash);
-        //     if (txResponse) {
-        //         console.log("Transaction is still pending. Hash:", tx.hash);
-        //         throw new Error(`Transaction pending: ${tx.hash}`);
-        //     }
-        //     throw waitError;
-        // }
     } catch (error) {
         console.error("Error in v3 swap:", error);
         throw error;
@@ -583,7 +563,7 @@ export const v3RouterTokenApproval = async(
         
         // Get current gas price and add 200% to ensure much faster processing
         const gasPrice = await provider.getGasPrice();
-        const adjustedGasPrice = (gasPrice.toBigInt() * BigInt(300)) / BigInt(100);
+        const adjustedGasPrice = (gasPrice.toBigInt() * BigInt(120)) / BigInt(100);
         
         const tx = await tokenContract.approve(
             piperv3SwapRouterAddress, 

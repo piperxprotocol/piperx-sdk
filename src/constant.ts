@@ -5,7 +5,7 @@ import { solidityPack } from 'ethers/lib/utils';
 import { piperv3_factory_abi } from './abi';
 import { providers } from 'ethers';
 
-const URL = 'https://story-testnet-evm.itrocket.net';
+const URL = 'https://odyssey.storyrpc.io';
 export const provider = new providers.JsonRpcProvider(URL);
 
 export const defaultTokens = [
