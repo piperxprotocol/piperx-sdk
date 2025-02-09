@@ -1,8 +1,8 @@
-import { abi, nft_position_manager_abi, piperv3_factory_abi, piperv3_pool_abi, piperv3SwapRouter_abi, v2_factory_abi, v2_pool_abi, v2_router_abi} from './abi'
-import { WIP_ADDRESS, piperv3FactoryAddress, piperv3NFTPositionManagerAddress, piperv3SwapRouterAddress, provider, v2ComputeAddress, v2RouterAddress } from './constant'
+import { abi, IPeripheryPaymentsWithFee_abi, nft_position_manager_abi, piperv3_factory_abi, piperv3_pool_abi, piperv3SwapRouter_abi, v2_factory_abi, v2_pool_abi, v2_router_abi} from './abi'
+import { ADDRESS_ZERO, WIP_ADDRESS, piperv3FactoryAddress, piperv3NFTPositionManagerAddress, piperv3SwapRouterAddress, provider, v2ComputeAddress, v2RouterAddress } from './constant'
 import { ethers } from 'ethers'
 import { routingExactInput } from './routing'
-import { keccak256 } from 'ethers/lib/utils'
+import { Interface, keccak256 } from 'ethers/lib/utils'
 import axios from 'axios';
 
 export const v3ClaimFee = async(
@@ -170,40 +170,95 @@ export const v3Swap = async(
     if (path.length != 3) {
         throw new Error("path must contain 3 elements");
     }
+
+    const address = signer.getAddress();
     try {
         const router = new ethers.Contract(piperv3SwapRouterAddress, piperv3SwapRouter_abi, signer);
 
+        // Get current gas price and add 20% to ensure faster processing
+        const gasPrice = await provider.getGasPrice();
+        const adjustedGasPrice = (gasPrice.toBigInt() * BigInt(120)) / BigInt(100);
+        
+        const txOptions = {
+            gasPrice: adjustedGasPrice,
+            ...(customGasLimit ? { gasLimit: customGasLimit } : {})
+        };
+
+        console.log("Preparing V3 swap with options:", {
+            gasPrice: ethers.utils.formatUnits(adjustedGasPrice, "gwei"),
+        });
+
         let tx;
-        const encodedPath = encodeV3Path(path);
-        if (path[0] == WIP_ADDRESS) { // swap Exact IP for tokens
-            tx = await router.exactInput({
-                path: encodedPath,
-                recipient: await signer.getAddress(),
-                deadline: expirationTimestamp,
-                amountIn: amount1,
-                amountOutMinimum: amount2Min
-            }, { 
-                value: amount1,  
-                ...(customGasLimit ? { gasLimit: customGasLimit } : {})
-            });
-        } else if (path[path.length - 1] == WIP_ADDRESS) { // TODO: swap Exact tokens for IP
-            tx = await router.exactInput({
-                path: encodeV3Path,
-                recipient: await signer.getAddress(),
-                deadline: expirationTimestamp,
-                amountIn: amount1,
-                amountOutMinimum: amount2Min
-            }, customGasLimit ? { gasLimit: customGasLimit } : {});
-        } else { // swap Exact tokens for tokens
-            tx = await router.exactInput({
-                path: encodeV3Path,
-                recipient: await signer.getAddress(),
-                deadline: expirationTimestamp,
-                amountIn: amount1,
-                amountOutMinimum: amount2Min
-            }, customGasLimit ? { gasLimit: customGasLimit } : {});
+        const exactInputSingleParams = {
+            tokenIn: path[0],
+            tokenOut: path[1],
+            fee: path[2],
+            recipient: path[1] === WIP_ADDRESS ? ethers.constants.AddressZero : address,
+            deadline: expirationTimestamp,
+            amountIn: amount1,
+            amountOutMinimum: amount2Min,
+            sqrtPriceLimitX96: BigInt(0)
+        };
+
+        if (path[0] === WIP_ADDRESS) { 
+            // Case 1: IP to Token (Native IP to ERC-20)
+            tx = await router.exactInputSingle(
+                exactInputSingleParams,
+                { 
+                    ...txOptions,
+                    value: amount1
+                }
+            );
+        } else if (path[1] === WIP_ADDRESS) { 
+            // Case 2: Token to IP (ERC-20 to Native IP)
+            const swapRouterInterface = new ethers.utils.Interface(piperv3SwapRouter_abi);
+            const peripheryPaymentsInterface = new ethers.utils.Interface([
+                "function unwrapWETH9(uint256 amountMinimum, address recipient) external payable"
+            ]);
+
+            const multicallData = [
+                swapRouterInterface.encodeFunctionData('exactInputSingle', [exactInputSingleParams]),
+                peripheryPaymentsInterface.encodeFunctionData('unwrapWETH9', [amount2Min, address])
+            ];
+
+            tx = await router.multicall(
+                multicallData,
+                txOptions
+            );
+        } else { 
+            // Case 3: Token to Token
+            tx = await router.exactInputSingle(
+                exactInputSingleParams,
+                txOptions
+            );
         }
-        return tx.wait();
+
+        console.log("V3 Transaction submitted:", tx.hash);
+        return await tx.wait();
+
+        // try {
+        //     const receipt = await Promise.race([
+        //         (async () => {
+        //             const receipt = await tx.wait(1);
+        //             console.log("Transaction mined in block:", receipt.blockNumber);
+        //             return receipt;
+        //         })(),
+        //         new Promise((_, reject) => 
+        //             setTimeout(() => reject(new Error('Transaction timeout after 60 seconds')), 60000)
+        //         )
+        //     ]);
+            
+        //     console.log("Transaction confirmed:", receipt.hash);
+        //     return receipt;
+        // } catch (waitError) {
+        //     // Check if transaction is still pending
+        //     const txResponse = await provider.getTransaction(tx.hash);
+        //     if (txResponse) {
+        //         console.log("Transaction is still pending. Hash:", tx.hash);
+        //         throw new Error(`Transaction pending: ${tx.hash}`);
+        //     }
+        //     throw waitError;
+        // }
     } catch (error) {
         console.error("Error in v3 swap:", error);
         throw error;
@@ -488,12 +543,29 @@ export const v2RouterTokenApproval = async(
 ) => {
     try {
         const tokenContract = new ethers.Contract(token, abi, signer);
+        
+        // Get current gas price and add 50% to ensure faster processing
+        const gasPrice = await provider.getGasPrice();
+        const adjustedGasPrice = (gasPrice.toBigInt() * BigInt(150)) / BigInt(100);
+        
         const tx = await tokenContract.approve(
             v2RouterAddress, 
             amount, 
-            customGasLimit ? { gasLimit: customGasLimit } : {}
+            {
+                gasPrice: adjustedGasPrice,
+                ...(customGasLimit ? { gasLimit: customGasLimit } : {})
+            }
         );
-        return await tx.wait();
+
+        // Wait for transaction with timeout
+        const receipt = await Promise.race([
+            tx.wait(),
+            new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Approval timeout after 60 seconds')), 60000)
+            )
+        ]);
+
+        return receipt;
     } catch (error) {
         console.error("Error in v2RouterTokenApproval:", error);
         throw error;
@@ -508,11 +580,21 @@ export const v3RouterTokenApproval = async(
 ) => {
     try {
         const tokenContract = new ethers.Contract(token, abi, signer);
+        
+        // Get current gas price and add 200% to ensure much faster processing
+        const gasPrice = await provider.getGasPrice();
+        const adjustedGasPrice = (gasPrice.toBigInt() * BigInt(300)) / BigInt(100);
+        
         const tx = await tokenContract.approve(
             piperv3SwapRouterAddress, 
             amount, 
-            customGasLimit ? { gasLimit: customGasLimit } : {}
+            {
+                gasPrice: adjustedGasPrice,
+                ...(customGasLimit ? { gasLimit: customGasLimit } : {}),
+                type: 0  // Legacy transaction type to ensure compatibility
+            }
         );
+
         return await tx.wait();
     } catch (error) {
         console.error("Error in v3RouterTokenApproval:", error);

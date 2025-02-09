@@ -14,6 +14,8 @@ export const defaultTokens = [
   '0x6D46EF45795B1c3e2a5f2A3F7aba5ea551be966f'
 ]
 
+export const ADDRESS_ZERO = "0x0000000000000000000000000000000000000000"
+
 export const fee2TickSpace = {"500": 10, "3000": 60, "10000": 200}
 
 export const WIP_ADDRESS = "0xe8CabF9d1FFB6CE23cF0a86641849543ec7BD7d5"
