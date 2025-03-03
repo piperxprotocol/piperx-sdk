@@ -5,38 +5,37 @@ import { solidityPack } from 'ethers/lib/utils';
 import { piperv3_factory_abi } from './abi';
 import { providers } from 'ethers';
 
-const URL = 'https://odyssey.storyrpc.io';
+const URL = 'https://mainnet.storyrpc.io';
 export const provider = new providers.JsonRpcProvider(URL);
 
 export const defaultTokens = [
-  '0x40fCa9cB1AB15eD9B5bDA19A52ac00A78AE08e1D',
-  '0x02F75bdBb4732cc6419aC15EeBeE6BCee66e826f',
-  '0x6D46EF45795B1c3e2a5f2A3F7aba5ea551be966f'
+  '0xF1815bd50389c46847f0Bda824eC8da914045D14',
+  '0x1514000000000000000000000000000000000000'
 ]
 
 export const ADDRESS_ZERO = "0x0000000000000000000000000000000000000000"
 
 export const fee2TickSpace = {"500": 10, "3000": 60, "10000": 200}
 
-export const WIP_ADDRESS = "0xe8CabF9d1FFB6CE23cF0a86641849543ec7BD7d5"
+export const WIP_ADDRESS = "0x1514000000000000000000000000000000000000"
 
-export const v2FactoryAddress = "0x700722D24f9256Be288f56449E8AB1D27C4a70ca"
+export const v2FactoryAddress = "0x6D3e2f58954bf4E1d0C4bA26a85a1b49b2e244C6"
 
-export const v2RouterAddress = "0x8812d810EA7CC4e1c3FB45cef19D6a7ECBf2D85D"
+export const v2RouterAddress = "0x674eFAa8C50cBEF923ECe625d3c276B7Bb1c16fB"
 
-export const piperv3QuoterAddress = "0x82C210d4aA5948f68E46Af355C0399c2E921e8e4"
+export const piperv3QuoterAddress = "0xe8CabF9d1FFB6CE23cF0a86641849543ec7BD7d5"
 
-export const piperv3SwapRouterAddress = "0xbBb8B63596d5447a12Ddee557ac9fA326f42B57D"
+export const piperv3SwapRouterAddress = "0x8295c195CEe31404ea082d253a140310b9a0A37e"
 
-export const piperv3FactoryAddress = "0xf3d448d7A83F749695c49d8411247fC3868fB633" // "0xDbc2D2C9514A50E905355388b8474fF3E7c59065" // "0x29330ED17323ecF354cE4AE871b2051cAF73E36D"
+export const piperv3FactoryAddress = "0xb8c21e89983B5EcCD841846eA294c4c8a89718f1"
 
-export const piperv3NFTPositionManagerAddress = "0xf03c65d9be145746f800E2781eD140F6dd238F38" //"0xBbd6437059feFa1E525645206eBc4cE942996f06" //"0xC938d8751164699c849716Ae504035601D485104"
+export const piperv3NFTPositionManagerAddress = "0x700722D24f9256Be288f56449E8AB1D27C4a70ca" 
 
 export const multicallAddress = "0xcA11bde05977b3631167028862bE2a173976CA11"
 
-export const initCodeHash = "0x754f724019203c806610a02ada224eb21dbe068a93d50486e52cf0ae30de457a"
+export const initCodeHashV2 = "0x823e88fdeb5597aaf4f360932ab07eb2ec6bb4dd75d44afb6814de02dd6cff9c"
 
-export const initCodeHashV3 = "0x1cb99584253b4230d0d18ef2cee0e35dd6d40717627345fbed0a92fed9392bd9"
+export const initCodeHashV3 = "0xa8ffca5939bbe6e18e96df724ec3b3539269b282d1be4a535d654f640a37dcf5"
 
 export const v2ComputeAddress = (token0: string, token1: string) => {
   const [token0Sorted, token1Sorted] = token0.toLowerCase() < token1.toLowerCase()
@@ -44,7 +43,7 @@ export const v2ComputeAddress = (token0: string, token1: string) => {
       : [token1, token0]
 
   const salt = keccak256(solidityPack(['address', 'address'], [token0Sorted, token1Sorted]))
-  const initCodeHash = "0x754f724019203c806610a02ada224eb21dbe068a93d50486e52cf0ae30de457a"
+  const initCodeHash = initCodeHashV2
 
   return getCreate2Address(v2FactoryAddress, salt, initCodeHash) as `0x${string}`
 }

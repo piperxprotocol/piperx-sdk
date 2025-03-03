@@ -162,7 +162,8 @@ export function encodeV3Path(path: string[]): string {
 export const v3Swap = async(
     amount1: bigint,
     amount2Min: bigint,
-    path: string[], 
+    path: string[],
+    useNative: boolean, // if the WIP address used in the path indicating native token
     expirationTimestamp: bigint,
     signer: ethers.Signer,
     customGasLimit?: number
@@ -184,35 +185,35 @@ export const v3Swap = async(
         
         const txOptions = {
             gasPrice: adjustedGasPrice,
-            ...(customGasLimit ? { gasLimit: customGasLimit } : {})
+            ...(customGasLimit ? { gasLimit: customGasLimit } : {}),
+            value: path[0] === WIP_ADDRESS && useNative ? amount1 : 0
         };
-
-        // console.log("Preparing V3 swap with options:", {
-        //     gasPrice: ethers.utils.formatUnits(adjustedGasPrice, "gwei"),
-        // });
 
         let tx;
-        const exactInputSingleParams = {
-            tokenIn: path[0],
-            tokenOut: path[2],
-            fee: path[1],
-            recipient: path[2] === WIP_ADDRESS ? ethers.constants.AddressZero : address,
+        const exactInputParams = {
+            path: encodeV3Path(path),
+            recipient: path[2] === WIP_ADDRESS && useNative ? ethers.constants.AddressZero : address,
             deadline: expirationTimestamp,
             amountIn: amount1,
-            amountOutMinimum: amount2Min,
-            sqrtPriceLimitX96: BigInt(0)
+            amountOutMinimum: amount2Min
         };
 
-        if (path[0] === WIP_ADDRESS) { 
+        if (path[0] === WIP_ADDRESS && useNative) { 
             // Case 1: IP to Token (Native IP to ERC-20)
-            tx = await router.exactInputSingle(
-                exactInputSingleParams,
-                { 
-                    ...txOptions,
-                    value: amount1
-                }
+            const swapRouterInterface = new Interface(piperv3SwapRouter_abi);
+            const IPeripheryPaymentsWithFeeInterface = new Interface(IPeripheryPaymentsWithFee_abi);
+            const callData = [];
+            // Add the swap call
+            callData.push(swapRouterInterface.encodeFunctionData('exactInput', [exactInputParams]));
+            
+            // Add the refundETH call - this is necessary when dealing with native tokens
+            callData.push(IPeripheryPaymentsWithFeeInterface.encodeFunctionData('refundETH'));
+
+            tx = await router.multicall(
+                callData,
+                txOptions
             );
-        } else if (path[2] === WIP_ADDRESS) { 
+        } else if (path[2] === WIP_ADDRESS && !useNative) { 
             // Case 2: Token to IP (ERC-20 to Native IP)
             const swapRouterInterface = new ethers.utils.Interface(piperv3SwapRouter_abi);
             const peripheryPaymentsInterface = new ethers.utils.Interface([
@@ -220,7 +221,7 @@ export const v3Swap = async(
             ]);
 
             const multicallData = [
-                swapRouterInterface.encodeFunctionData('exactInputSingle', [exactInputSingleParams]),
+                swapRouterInterface.encodeFunctionData('exactInput', [exactInputParams]),
                 peripheryPaymentsInterface.encodeFunctionData('unwrapWETH9', [amount2Min, address])
             ];
 
@@ -230,8 +231,8 @@ export const v3Swap = async(
             );
         } else { 
             // Case 3: Token to Token
-            tx = await router.exactInputSingle(
-                exactInputSingleParams,
+            tx = await router.exactInput(
+                exactInputParams,
                 txOptions
             );
         }
@@ -249,14 +250,15 @@ export const swap = async(
     amount1: bigint,
     amount2Min: bigint,
     path: string[], 
+    useNative: boolean,
     expirationTimestamp: bigint,
     signer: ethers.Signer,
     customGasLimit?: number
 ) => {
     if (path[1].length < 10) { // v3 swap
-        return await v3Swap(amount1, amount2Min, path, expirationTimestamp, signer, customGasLimit);
+        return await v3Swap(amount1, amount2Min, path, useNative, expirationTimestamp, signer, customGasLimit);
     } else { // v2 swap
-        return await v2Swap(amount1, amount2Min, path, expirationTimestamp, signer, customGasLimit);
+        return await v2Swap(amount1, amount2Min, path, useNative, expirationTimestamp, signer, customGasLimit);
     }
 }
 
@@ -342,6 +344,7 @@ export const v2Swap = async(
     amount1: bigint,
     amount2Min: bigint,
     path: string[], 
+    useNative: boolean,
     expirationTimestamp: bigint,
     signer: ethers.Signer,
     customGasLimit?: number
@@ -355,22 +358,20 @@ export const v2Swap = async(
         
         const txOptions = {
             gasPrice: adjustedGasPrice,
-            ...(customGasLimit ? { gasLimit: customGasLimit } : {}), // Only include gasLimit if custom value provided
+            ...(customGasLimit ? { gasLimit: customGasLimit } : {}),
+            value: path[0] == WIP_ADDRESS && useNative ? amount1 : 0
         };
 
         let tx;
-        if (path[0] == WIP_ADDRESS) {
+        if (path[0] == WIP_ADDRESS && useNative) {
             tx = await router.swapExactETHForTokens(
                 amount2Min,
                 path,
                 await signer.getAddress(),  // Make sure we await this
                 expirationTimestamp,
-                { 
-                    ...txOptions,
-                    value: amount1
-                }
+                txOptions
             );
-        } else if (path[path.length - 1] == WIP_ADDRESS) {
+        } else if (path[path.length - 1] == WIP_ADDRESS && useNative) {
             tx = await router.swapExactTokensForETH(
                 amount1,
                 amount2Min,
