@@ -1,7 +1,7 @@
 import { abi, IPeripheryPaymentsWithFee_abi, nft_position_manager_abi, piperv3_factory_abi, piperv3_pool_abi, piperv3SwapRouter_abi, v2_factory_abi, v2_pool_abi, v2_router_abi} from './abi'
 import { ADDRESS_ZERO, WIP_ADDRESS, piperv3FactoryAddress, piperv3NFTPositionManagerAddress, piperv3SwapRouterAddress, provider, v2ComputeAddress, v2RouterAddress } from './constant'
 import { ethers } from 'ethers'
-import { routingExactInput } from './routing'
+import { encodeV3Path, routingExactInput } from './routing'
 import { Interface, keccak256 } from 'ethers/lib/utils'
 import axios from 'axios';
 
@@ -142,23 +142,6 @@ export const v3AddLiquidity = async(
     }
 }
 
-// token0 fee token1 fee token2 fee token3 fee token4
-export function encodeV3Path(path: string[]): string {
-    if (path.length < 2 || path.length % 2 !== 1) {
-        throw new Error('Path must contain odd number of elements (address + fee + address + fee + ... + address)');
-    }
-
-    const types: string[] = ['address'];
-    const values: (string | number)[] = [path[0]];
-
-    // For each pair of addresses, we need a fee in between
-    for (let i = 1; i < path.length; i += 2) {
-        types.push('uint24', 'address');
-        values.push(Number(path[i]), path[i + 1]);
-    }
-    return ethers.utils.solidityPack(types, values);
-}
-
 export const v3Swap = async(
     amount1: bigint,
     amount2Min: bigint,
@@ -168,14 +151,9 @@ export const v3Swap = async(
     signer: ethers.Signer,
     customGasLimit?: number
 ) => {
-    if (path.length != 3) {
-        throw new Error("path must contain 3 elements");
-    }
-
-    // let encodePath = encodeV3Path(path);
-    // console.log("encodePath: ", encodePath);
+   
     const address = await signer.getAddress();
-    // console.log("address: ", address);
+   
     try {
         const router = new ethers.Contract(piperv3SwapRouterAddress, piperv3SwapRouter_abi, signer);
 
@@ -255,7 +233,7 @@ export const swap = async(
     signer: ethers.Signer,
     customGasLimit?: number
 ) => {
-    if (path[1].length < 10) { // v3 swap
+    if (path.length > 2 && path[2].length < 10) { // v3 swap
         return await v3Swap(amount1, amount2Min, path, useNative, expirationTimestamp, signer, customGasLimit);
     } else { // v2 swap
         return await v2Swap(amount1, amount2Min, path, useNative, expirationTimestamp, signer, customGasLimit);
